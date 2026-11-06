@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TF家族 · 双人猜猜看</title>
+<style>
+  * { box-sizing: border-box; padding: 0; margin: 0; }
+  body { font-family: -apple-system, sans-serif; background: #fff9fc; color: #2d1b2e; min-height: 100vh; padding: 20px 14px 60px; display: flex; justify-content: center; }
+  .app { width: 100%; max-width: 820px; }
+  h1 { font-size: 22px; font-weight: 800; color: #db2777; text-align: center; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: #9d6b8a; text-align: center; margin-bottom: 18px; line-height: 1.7; }
+  .card { background: #fff; border: 1px solid #fce7f3; border-radius: 16px; padding: 16px; margin-bottom: 14px; box-shadow: 0 6px 20px rgba(219,39,119,.05); }
+  .card-head { font-size: 13.5px; font-weight: 700; color: #be185d; margin-bottom: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .card-head small { font-weight: 400; font-size: 11px; color: #b48aa6; }
+  input[type=text] { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid #fbcfe8; background: #fff7fb; color: #831843; font-size: 13px; font-family: inherit; outline: none; }
+  input[type=text]:focus { border-color: #f472b6; background: #fff; }
+  button { padding: 9px 18px; border-radius: 10px; border: none; background: #db2777; color: #fff; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; transition: .15s; }
+  button:hover { background: #be185d; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: #fce7f3; color: #be185d; }
+  .row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .secret-box { background: linear-gradient(135deg, #fce7f3, #fff7fb); border: 1px dashed #f472b6; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px; }
+  .secret-box .label { font-size: 12px; color: #b48aa6; margin-bottom: 8px; }
+  .secret-box .value { font-size: 24px; font-weight: 800; color: #be185d; letter-spacing: 2px; }
+  .turn-indicator { text-align: center; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 700; margin-bottom: 12px; transition: .2s; }
+  .turn-indicator.my-turn { background: #dcfce7; color: #15803d; }
+  .turn-indicator.opp-turn { background: #f3f4f6; color: #a3a3a3; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 10px; max-height: 280px; overflow-y: auto; }
+  .person { position: relative; padding: 14px 4px 10px; border-radius: 9px; border: 1px solid #fbcfe8; background: #fff7fb; color: #831843; font-size: 12.5px; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .excluded-area .person { opacity: .55; text-decoration: line-through; background: #f3f4f6; color: #9ca3af; }
+  .action-btn { position: absolute; top: 2px; background: none; border: none; font-size: 11px; padding: 4px; transition: .1s; }
+  .btn-reject { left: 2px; color: #ef4444; }
+  .btn-guess-one { right: 2px; color: #22c55e; }
+  .btn-guess-one:disabled { opacity: 0.2; }
+  .btn-restore { margin-top: 4px; font-size: 10px; background: #e5e7eb; border: none; padding: 3px 8px; border-radius: 4px; color: #4b5563; }
+  .history { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; margin-top: 8px; }
+  .h-item { font-size: 12.5px; padding: 7px 10px; border-radius: 8px; }
+  .h-item.me { background: #fdf2f8; color: #831843; align-self: flex-end; max-width: 85%; }
+  .h-item.opp { background: #f0f9ff; color: #1e3a5f; align-self: flex-start; max-width: 85%; }
+  .h-item.system { background: #fef9c3; color: #854d0e; text-align: center; font-size: 12px; }
+  .banner { position: fixed; inset: 0; background: rgba(255,249,252,.95); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 50; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="lobby">
+    <h1>TF家族 · 双人猜猜看</h1>
+    <p class="sub">你和朋友各抽一位成员，轮流提问，先猜中对方答案者获胜</p>
+    <div class="card">
+      <button id="btn-create">创建新房间</button>
+      <p id="room-code-display" class="sub hidden" style="margin-top:10px; font-size:14px;"></p>
+    </div>
+    <div class="card">
+      <input id="join-code" type="text" placeholder="输入房间码" maxlength="6" />
+      <div class="row-btns"><button id="btn-join">加入</button></div>
+    </div>
+  </div>
+  <div id="game" class="hidden">
+    <h1>房间 <b id="g-room"></b></h1>
+    <div class="secret-box">
+      <div class="label">你抽到的成员</div>
+      <div class="value" id="my-secret">—</div>
+    </div>
+    <div id="turn-indicator" class="turn-indicator"></div>
+    <div class="card">
+      <input id="question-input" type="text" placeholder="输入问题，例如：姓张吗？" />
+      <div class="row-btns"><button id="btn-ask">发送提问</button></div>
+      <div id="answer-area" class="hidden" style="margin-top:12px;">
+        <div class="card-head">对方提问：<span id="opp-question"></span></div>
+        <div class="row-btns">
+          <button data-ans="是">是</button>
+          <button data-ans="否" class="ghost">否</button>
+          <button data-ans="不确定" class="ghost">不确定</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">待选成员</div>
+      <input id="search" type="text" placeholder="搜索名字…" style="margin-bottom:10px;" />
+      <div id="candidate-grid" class="grid"></div>
+    </div>
+    <div class="card excluded-area">
+      <div class="card-head">已排除</div>
+      <div id="excluded-grid" class="grid"></div>
+    </div>
+    <div class="card"><div id="history" class="history"></div></div>
+  </div>
+</div>
+<div id="banner" class="banner hidden"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function () {
+  const socket = io();
+  const $ = (id) => document.getElementById(id);
+  let roomId = "", myId = "", myPool = [], isMyTurn = false, gameOver = false;
+  let excluded = new Set();
+
+  $("btn-create").addEventListener("click", () => { socket.emit("create-room"); });
+  socket.on("room-created", (id) => {
+    roomId = id; $("room-code-display").textContent = "房间码：" + id;
+    $("room-code-display").classList.remove("hidden"); $("btn-create").disabled = true;
+  });
+  $("btn-join").addEventListener("click", () => {
+    roomId = $("join-code").value.trim().toUpperCase();
+    socket.emit("join-room", roomId);
+  });
+  socket.on("error-msg", (msg) => alert(msg));
+  socket.on("room-ready", ({ roomId: rid, turn }) => {
+    roomId = rid; myId = socket.id;
+    $("lobby").classList.add("hidden"); $("game").classList.remove("hidden");
+    $("g-room").textContent = rid; updateTurn(turn === myId);
+  });
+  socket.on("your-secret", (data) => {
+    $("my-secret").textContent = data.secret; myPool = data.pool; renderGrids();
+  });
+  function updateTurn(myTurn) {
+    isMyTurn = myTurn;
+    $("turn-indicator").textContent = myTurn ? "🟢 轮到你了" : "⏳ 等待对方…";
+    $("turn-indicator").className = "turn-indicator " + (myTurn ? "my-turn" : "opp-turn");
+    $("btn-ask").disabled = !myTurn;
+    renderGrids();
+  }
+  socket.on("turn-changed", (turn) => updateTurn(turn === myId));
+  $("btn-ask").addEventListener("click", () => {
+    const q = $("question-input").value.trim();
+    if (!q) return; socket.emit("ask", { roomId, question: q });
+    $("question-input").value = ""; addHistory("me", "问：" + q);
+  });
+  socket.on("question-asked", ({ from, question }) => {
+    if (from === myId) return;
+    $("opp-question").textContent = question; $("answer-area").classList.remove("hidden");
+    addHistory("opp", "问：" + question);
+  });
+  document.querySelectorAll("[data-ans]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      socket.emit("answer", { roomId, answer: btn.dataset.ans });
+      addHistory("me", "答：" + btn.dataset.ans); $("answer-area").classList.add("hidden");
+    });
+  });
+  socket.on("answer-given", ({ from, answer }) => { if (from !== myId) addHistory("opp", "答：" + answer); });
+  socket.on("guess-result", ({ from, correct }) => {
+    if (from === myId) addHistory("system", correct ? "🎉 猜对了！" : "❌ 猜错了");
+    else addHistory("system", correct ? "对方猜对了…" : "对方猜错了");
+    if (correct) gameOver = true;
+  });
+  socket.on("game-over", ({ winner, answer }) => {
+    gameOver = true; const b = $("banner"); b.classList.remove("hidden");
+    b.innerHTML = `<h2>${winner === myId ? "🎉 你赢了！" : "😢 对方赢了"}</h2><div>答案：${answer}</div><button onclick="location.reload()">再来一局</button>`;
+  });
+  socket.on("opponent-left", () => { addHistory("system", "对方离开"); gameOver = true; });
+  function renderGrids() {
+    const candGrid = $("candidate-grid"), excGrid = $("excluded-grid"), kw = $("search").value.trim();
+    candGrid.innerHTML = ""; excGrid.innerHTML = "";
+    myPool.forEach((name) => {
+      if (kw && name.indexOf(kw) === -1) return;
+      const card = document.createElement("div"); card.className = "person";
+      if (excluded.has(name)) {
+        card.innerHTML = `<span>${name}</span><button class="btn-restore">恢复</button>`;
+        card.querySelector(".btn-restore").onclick = () => { excluded.delete(name); renderGrids(); };
+        excGrid.appendChild(card);
+      } else {
+        card.innerHTML = `<button class="action-btn btn-reject">❌</button><span>${name}</span><button class="action-btn btn-guess-one">✔️</button>`;
+        card.querySelector(".btn-reject").onclick = () => { excluded.add(name); renderGrids(); };
+        const gBtn = card.querySelector(".btn-guess-one");
+        if (!isMyTurn || gameOver) gBtn.disabled = true;
+        else gBtn.onclick = () => { if(confirm(`确定是 ${name} 吗？`)) { socket.emit("guess", { roomId, name }); addHistory("me", "猜：" + name); } };
+        candGrid.appendChild(card);
+      }
+    });
+  }
+  $("search").addEventListener("input", renderGrids);
+  function addHistory(type, text) {
+    const d = document.createElement("div"); d.className = "h-item " + type; d.textContent = text;
+    $("history").appendChild(d); $("history").scrollTop = $("history").scrollHeight;
+  }
+  socket.on("connect", () => { myId = socket.id; });
+})();
+</script>
+</body>
+</html>
